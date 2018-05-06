@@ -1,1 +1,1 @@
-NAME node bot.js
+NAME: node bot.js
