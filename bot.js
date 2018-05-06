@@ -127,7 +127,7 @@ bot.on("message", msg => {
 function cmd_sleep(msg) {
     if (SUB.isBotMaster(msg)) {
         bot.channels.get(CFG.botChan).send("Je vais me coucher. Bonne nuit tout le monde !");
-        setTimeout(function(){process.exit();}, 5000);
+        setTimeout(function(){bot.destroy();}, 5000);
     } else {msg.reply("faut pas croire, seule ma maîtresse peut s'offrir ce loisir.")}
 }
 function cmd_help(msg,arg) {
