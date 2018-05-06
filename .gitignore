@@ -1,0 +1,5 @@
+node_modules/
+auth.js
+config.json
+package-lock.json
+*.backup
