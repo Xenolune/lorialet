@@ -1,1 +1,1 @@
-NAME: node bot.js
+lorialet-bot: node bot.js
