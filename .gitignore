@@ -7,5 +7,4 @@ package-lock.json
 
 # Others
 auth.js
-config.json
 *.backup
