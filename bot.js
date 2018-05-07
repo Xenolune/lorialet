@@ -1,11 +1,12 @@
 /* Header */
 const Discord = require("discord.js")
 const FS = require("fs")
+const AWS = require("aws-sdk")
 const bot = new Discord.Client()
 const CFG = require("./config.json")
 /* Bot Start */
 bot.login(CFG.token)
-bot.on("ready", () => {console.log("Connecté sur Discord en tant que " + bot.user.tag);})
+bot.on("ready", () => {console.log("Connecté sur Discord en tant que " + bot.user.tag);bot.channels.get(CFG.botMasterChan).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");})
 /* MySQL */ /*
 const MySQL = require("mysql")
 const db = MySQL.createConnection({
@@ -126,7 +127,7 @@ bot.on("message", msg => {
 /* Bot Modules */
 function cmd_sleep(msg) {
     if (SUB.isBotMaster(msg)) {
-        bot.channels.get(CFG.botChan).send("Je vais me coucher. Bonne nuit tout le monde !");
+        bot.channels.get(CFG.botMasterChan).send("Je vais me coucher. Bonne nuit tout le monde !");
         setTimeout(function(){bot.destroy();}, 5000);
     } else {msg.reply("faut pas croire, seule ma maîtresse peut s'offrir ce loisir.")}
 }
