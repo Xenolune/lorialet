@@ -5,7 +5,7 @@ const AWS = require("aws-sdk")
 const bot = new Discord.Client()
 const CFG = require("./config.json")
 /* Bot Start */
-bot.login(CFG.token)
+bot.login(process.env.DISCORD_TOKEN)
 bot.on("ready", () => {console.log("Connecté sur Discord en tant que " + bot.user.tag);bot.channels.get(CFG.botMasterChan).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");})
 /* MySQL */ /*
 const MySQL = require("mysql")

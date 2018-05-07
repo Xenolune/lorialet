@@ -1,5 +1,11 @@
+# NodeJS Related
 node_modules/
+package-lock.json
+
+# Heroku Related
+.env
+
+# Others
 auth.js
 config.json
-package-lock.json
 *.backup
