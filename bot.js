@@ -2,19 +2,16 @@
 const Discord = require("discord.js")
 const FS = require("fs")
 const AWS = require("aws-sdk")
-const bot = new Discord.Client()
 const CFG = require("./config.json")
-/* Bot Start */
-bot.login(process.env.DISCORD_TOKEN)
-bot.on("ready", () => {console.log("Connecté sur Discord en tant que " + bot.user.tag);bot.channels.get(CFG.botMasterChan).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");})
-/* MySQL */ /*
-const MySQL = require("mysql")
-const db = MySQL.createConnection({
-host: CFG.db.host,
-user: CFG.db.user,
-password: CFG.db.password,
-database: "discord_bot"
+const bot = new Discord.Client()
+/* PostgreSQL */ /*
+const { Client } = require("pg")
+const db = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl:true
 })
+db.connect()
+
 db.connect(function(err) {
     if (err) throw err;
     let q_bang = "SELECT value FROM config WHERE name='bang'";
@@ -36,65 +33,89 @@ const SUB ={
     reqCmd : msg => SUB.hasBang(msg) && !SUB.isBot(msg) ? SUB.getCmd(msg) : null,
     isNotPing : msg => SUB.isBot(msg) && ((SUB.reqCmd(msg) == "ping") && (ping.last == false))
 }
-var chanAll;
-var chanEntrance;
-var chanMember;
-var chanBotMaster;
-var chanBot;
-var roleBotMaster;
-var roleBot;
-var roleMember;
-const CMD_Next = {
+const CMD = {
     "bang": {
         usage: "!bang <character>",
         description: "Permet de modifier le \"bang\" d'appel de commande. La fonction n'est pas encore implémentée pour l'instant.",
-        allowedIn: [chanBotMaster],
-        allowedFor: [roleBotMaster],
-        fcn: cmd_bang
+        allowedIn: "#le-client-ssh",
+        allowedFor: "@Dev Bot",
+        allowedInID: [CFG.chanBotMaster],
+        allowedForID: [CFG.roleBotMaster],
+        fcn: msg => {
+            if (SUB.getParam(msg)[1]) {
+                msg.reply("Vous voulez changer pour **" + SUB.getParam(msg)[1] +"**?")
+            } else {msg.reply("Vous devez indiquer un paramètre avec cette fonction.")}
+            msg.channel.send("Pour être honnête, je n'ai pas encore de fonction pour changer le bang, mais c'est déjà ça.")
+        }
     },
     "help": {
         usage: "!help [commande]",
         description: "Affiche la liste des commandes ou les informations d'une commande spécifique.",
-        allowedIn: [chanBot, chanBotMaster],
-        allowedFor: [roleMember],
-        fcn: cmd_help
+        allowedIn: "#le-réseau-local + #le-client-ssh",
+        allowedFor: "Tout le monde",
+        allowedInID: [CFG.chanBot, CFG.chanBotMaster],
+        allowedForID: [CFG.memberRole],
+        fcn: (msg,arg) => {
+            msg.channel.send("Voici la liste de mes fonctions : \n")
+            msg.channel.send(Object.keys(CMD))
+            msg.channel.send("\nElles doivent être précédées du symbole \"" + CFG.bang + "\" pour être exécutées." )
+            msg.reply("pour l'instant j'ai pas plus de détails à te donner, désolée. Je t'aime.")
+        }
     },
     "ping": {
         usage: "!ping",
         description: "Pour jouer au ping-pong avec le bot. Ne læ fatiguez pas trop s'il vous plaît.",
-        allowedIn: [chanBot, chanBotMaster],
-        allowedFor: [roleMember],
-        fcn: cmd_ping
+        allowedIn: "#le-réseau-local + #le-client-ssh",
+        allowedFor: "@everyone",
+        allowedInID: [CFG.chanBot, CFG.chanBotMaster],
+        allowedForID: [CFG.memberRole],
+        fcn: msg => {
+            if (ping.count < 25 && ping.allowed) {
+                ping.last = true;
+                ping.count++;
+                console.log("ping count: " + ping.count);
+                msg.reply("pong !");
+                if (ping.count%10 == 0) {msg.reply("quelle partie, c'est fatiguant à force !")};
+            } else if (ping.allowed) {
+                ping.timeout(msg);}
+        }
     },
     "sleep": {
         usage: "!sleep",
         description: "Éteint le Bot.",
-        allowedIn: [chanBotMaster],
-        allowedFor: [roleBotMaster],
-        fcn: cmd_sleep
+        allowedIn: "#le-client-ssh",
+        allowedFor: "@Dev Bot",
+        allowedInID: [CFG.chanBotMaster],
+        allowedForID: [CFG.roleBotMaster],
+        fcn: msg => {
+            if (SUB.isBotMaster(msg)) {
+                bot.channels.get(CFG.botMasterChan).send("Je vais me coucher. Bonne nuit tout le monde !");
+                setTimeout(function(){bot.destroy();}, 5000);
+            } else {msg.reply("faut pas croire, seule ma maîtresse peut s'offrir ce loisir.")}
+        }
     },
     "talk": {
         usage: "!talk Message",
         description: "Envoie un message de la part du bot.",
-        allowedIn: [chanBotMaster],
-        allowedFor: [roleBotMaster],
-        fcn: cmd_talk
+        allowedIn: "#le-client-ssh",
+        allowedFor: "@Dev Bot",
+        allowedInID: [CFG.chanBotMaster],
+        allowedForID: [CFG.roleBotMaster],
+        fcn: msg => {
+            let cnt = msg.content.substring(6)
+            let chan = bot.channels.get(CFG.botChan)
+            chan.send(cnt)
+        }
     },
-/*    "cmdSample": {
-        usage: "<param1> <param2>",
-        description: "Description",
-        allowedIn: [Channel, List],
-        allowedFor: [Group, List],
-        fcn: fcn(param1, param2)
-    } */
-}
-const CMD = {
-    bang: cmd_bang,
-    help: cmd_helpOld,
-    ping: cmd_ping,
-    sleep: cmd_sleep,
-    talk: cmd_talk,
-    notCmd: msg => msg.reply(SUB.getCmd(msg) + " n'est pas une commande que je connaisse. Essaye " + CFG.bang + "help." )
+    "notCmd": {
+        usage: "!**********",
+        description: "Message d'erreur en cas de commande erronée.",
+        allowedIn: "Partout",
+        allowedFor: "Tout le monde",
+        allowedInID: null,
+        allowedForID: [CFG.memberRole],
+        fcn: msg => msg.reply(SUB.getCmd(msg) + " n'est pas une commande que je connaisse. Essaye " + CFG.bang + "help." )
+    }
 }
 const ping = {
     count: 0,
@@ -112,6 +133,12 @@ const ping = {
         }, pause);
     }
 };
+/* Bot Start */
+bot.login(process.env.DISCORD_TOKEN)
+bot.on("ready", () => {
+    console.log("Connecté sur Discord en tant que " + bot.user.tag);
+    bot.channels.get(CFG.botMasterChan).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");
+})
 /* Bot Triggers */
 bot.on("message", msg => {
     if (SUB.isOnBotChan(msg)) {
@@ -124,56 +151,3 @@ bot.on("message", msg => {
         }
     }
 })
-/* Bot Modules */
-function cmd_sleep(msg) {
-    if (SUB.isBotMaster(msg)) {
-        bot.channels.get(CFG.botMasterChan).send("Je vais me coucher. Bonne nuit tout le monde !");
-        setTimeout(function(){bot.destroy();}, 5000);
-    } else {msg.reply("faut pas croire, seule ma maîtresse peut s'offrir ce loisir.")}
-}
-function cmd_help(msg,arg) {
-    msg.channel.send("Voici la liste de mes fonctions : \n")
-    msg.channel.send(Object.keys(CMD))
-    msg.channel.send("\nElles doivent être précédées du symbole \"" + CFG.bang + "\" pour être exécutées." )
-    msg.reply("pour l'instant j'ai pas plus de détails à te donner, désolée. Je t'aime.")
-}
-function cmd_helpOld(msg) {
-    msg.channel.send("Voici la liste de mes fonctions : \n")
-    msg.channel.send(Object.keys(CMD))
-    msg.channel.send("\nElles doivent être précédées du symbole \"" + CFG.bang + "\" pour être exécutées." )
-    msg.reply("pour l'instant j'ai pas plus de détails à te donner, désolée. Je t'aime.")
-}
-function cmd_ping(msg) {
-    if (ping.count < 25 && ping.allowed) {
-        ping.last = true;
-        ping.count++;
-        console.log("ping count: " + ping.count);
-        msg.reply("pong !");
-        if (ping.count%10 == 0) {msg.reply("quelle partie, c'est fatiguant à force !")};
-    } else if (ping.allowed) {
-        ping.timeout(msg);}
-}
-function cmd_bang(msg) {
-    if (SUB.getParam(msg)[1]) {
-        msg.reply("Vous voulez changer pour **" + SUB.getParam(msg)[1] +"**?")
-    } else {msg.reply("Vous devez indiquer un paramètre avec cette fonction.")}
-    msg.channel.send("Pour être honnête, je n'ai pas encore de fonction pour changer le bang, mais c'est déjà ça.")
-}
-function cmd_talk(msg) {
-    let cnt = msg.content.substring(6)
-    let chan = bot.channels.get(CFG.botChan)
-    chan.send(cnt)
-}
-/* Backup from random stuff
-bot.on("love", msg => {
-    let cnt = msg.content;
-    if (cnt.includes("aussi")) {
-        msg.reply("tu es douxe !");
-    } else if (cnt.includes(CFG.botName)) {
-        msg.reply("moi aussi je t'aime !")
-    } else {
-        msg.reply("est-ce que tu parles de moi ?")
-        bot.emit("loveQuestion", msg);
-    };
-});
-*/

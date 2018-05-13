@@ -1,15 +1,10 @@
 {
-    "db": {
-        "host": "127.0.0.1",
-        "user": "root",
-        "password": ""
-    },
-    "botName": "Lorialet",
-    "botID" : "430020470897770516",
+    "bang": "!",
+    "LorialetID" : "430020470897770516",
+    "LorialetNextID" : "442965211054473216",
     "botChan": "429433091245735946",
     "botMasterChan": "435867542108635148",
-    "botMasterRole": "435775529292005376",
     "botMasterMember": "222028577405665283",
-    "notifChan": "431430927030288384",
-    "bang": "!"
+    "botMasterRole": "435775529292005376",
+    "memberRole": "&328608239958753284"
 }
