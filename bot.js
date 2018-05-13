@@ -145,8 +145,8 @@ bot.on("message", msg => {
         SUB.isNotPing(msg) ? ping.reset() : null
         if (SUB.hasBang(msg)) {
             if (CMD[SUB.reqCmd(msg)] != undefined) {
-                CMD[SUB.reqCmd(msg)](msg)
-            } else { CMD.notCmd(msg)
+                CMD[SUB.reqCmd(msg)].fcn(msg)
+            } else { CMD.notCmd.fcn(msg)
             }
         }
     }
