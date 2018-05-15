@@ -22,7 +22,7 @@ db.connect(function(err) {
     })
 }) */
 
-/* Bot Objects */
+/* Bot Commands */
 const SUB ={
     isBot : msg => msg.author.bot,
     isBotMaster : msg => msg.member.roles.get(CFG.botMasterRole),
@@ -35,8 +35,8 @@ const SUB ={
 }
 const CMD = {
     "bang": {
-        usage: "!bang <character>",
-        description: "Permet de modifier le \"bang\" d'appel de commande. La fonction n'est pas encore implémentée pour l'instant.",
+        usage: CFG.bang + "bang <character>",
+        description: "Permet de modifier le \"bang\" d'appel de commande.\nLa fonction n'est pas encore implémentée pour l'instant.",
         allowedIn: "#le-client-ssh",
         allowedFor: "@Dev Bot",
         allowedInID: [CFG.chanBotMaster],
@@ -49,24 +49,44 @@ const CMD = {
         }
     },
     "help": {
-        usage: "!help [commande]",
+        usage: CFG.bang + "help [commande]",
         description: "Affiche la liste des commandes ou les informations d'une commande spécifique.",
         allowedIn: "#le-réseau-local + #le-client-ssh",
         allowedFor: "Tout le monde",
         allowedInID: [CFG.chanBot, CFG.chanBotMaster],
         allowedForID: [CFG.memberRole],
-        fcn: (msg,arg) => {
-            msg.channel.send("Voici la liste de mes fonctions : \n")
-            msg.channel.send(Object.keys(CMD))
-            msg.channel.send("\nElles doivent être précédées du symbole \"" + CFG.bang + "\" pour être exécutées." )
-            msg.reply("pour l'instant j'ai pas plus de détails à te donner, désolée. Je t'aime.")
+        fcn: (msg) => {
+            if (SUB.getParam(msg)[1] == undefined) {
+                let embed = new Discord.RichEmbed()
+                embed.setColor(38600)
+                Object.keys(CMD).forEach(function(key, i, array) {
+                    embed.addField(CMD[key].usage, CMD[key].description)
+                    i < array.length - 1 ? embed.addBlankField() : null
+                })
+                msg.channel.send("Voici la liste de mes fonctions : \n")
+                msg.channel.send({ embed })
+            } else {
+                if (CMD[SUB.getParam(msg)[1]] != undefined) {
+                    let cmd = CMD[SUB.getParam(msg)[1]]
+                    let embed = new Discord.RichEmbed()
+                    embed.setColor(51350)
+                    embed.setAuthor(cmd)
+                    embed.addField("Usage: ", cmd.usage)
+                    embed.addField("Description: ", cmd.description)
+                    embed.addField("Cannaux autorisés: ", cmd.allowedIn, true)
+                    embed.addField("Membres autorisés: ", cmd.allowedFor, true)
+                    msg.channel.send({ embed })
+                } else {
+                    msg.reply("Cette commande n'existe pas.")
+                }
+            }
         }
     },
     "ping": {
-        usage: "!ping",
-        description: "Pour jouer au ping-pong avec le bot. Ne læ fatiguez pas trop s'il vous plaît.",
+        usage: CFG.bang + "ping",
+        description: "Pour jouer au ping-pong avec ce bot.\nNe læ fatiguez pas trop s'il vous plaît.",
         allowedIn: "#le-réseau-local + #le-client-ssh",
-        allowedFor: "@everyone",
+        allowedFor: "Tout le monde",
         allowedInID: [CFG.chanBot, CFG.chanBotMaster],
         allowedForID: [CFG.memberRole],
         fcn: msg => {
@@ -81,7 +101,7 @@ const CMD = {
         }
     },
     "sleep": {
-        usage: "!sleep",
+        usage: CFG.bang + "sleep",
         description: "Éteint le Bot.",
         allowedIn: "#le-client-ssh",
         allowedFor: "@Dev Bot",
@@ -95,8 +115,8 @@ const CMD = {
         }
     },
     "talk": {
-        usage: "!talk Message",
-        description: "Envoie un message de la part du bot.",
+        usage: CFG.bang + "talk [Message]",
+        description: "Envoie un message de la part du bot sur #le-réseau-local.",
         allowedIn: "#le-client-ssh",
         allowedFor: "@Dev Bot",
         allowedInID: [CFG.chanBotMaster],
@@ -108,7 +128,7 @@ const CMD = {
         }
     },
     "notCmd": {
-        usage: "!**********",
+        usage: CFG.bang + " + n'importe quelle suite de caractères non reconnus",
         description: "Message d'erreur en cas de commande erronée.",
         allowedIn: "Partout",
         allowedFor: "Tout le monde",
