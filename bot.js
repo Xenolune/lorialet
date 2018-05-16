@@ -70,7 +70,7 @@ const CMD = {
                     let cmd = CMD[SUB.getParam(msg)[1]]
                     let embed = new Discord.RichEmbed()
                     embed.setColor(51350)
-                    embed.setAuthor(cmd)
+                    embed.setAuthor(SUB.getParam(msg)[1])
                     embed.addField("Usage: ", cmd.usage)
                     embed.addField("Description: ", cmd.description)
                     embed.addField("Cannaux autorisés: ", cmd.allowedIn, true)
@@ -115,16 +115,24 @@ const CMD = {
         }
     },
     "talk": {
-        usage: CFG.bang + "talk [Message]",
-        description: "Envoie un message de la part du bot sur #le-réseau-local.",
+        usage: CFG.bang + "talk [salon] <Message>",
+        description: "Envoie un message de la part du bot sur #le-réseau-local par défaut, ou un autre [salon] si précisé",
         allowedIn: "#le-client-ssh",
         allowedFor: "@Dev Bot",
         allowedInID: [CFG.chanBotMaster],
         allowedForID: [CFG.roleBotMaster],
         fcn: msg => {
+            let chan
             let cnt = msg.content.substring(6)
-            let chan = bot.channels.get(CFG.botChan)
-            chan.send(cnt)
+            let request = (cnt.startsWith("<#") ? SUB.getParam(msg)[1].substring(2,20) : null)
+            if (request == undefined) {
+                chan = bot.channels.get(CFG.botChan)
+            } else {
+                let exists = (bot.channels.get(request) ? true : false)
+                chan = (exists ? bot.channels.get(request) : null)
+                cnt = cnt.substring(22)
+            }
+            chan == undefined ? msg.reply("Erreur") : chan.send(cnt)
         }
     },
     "notCmd": {
