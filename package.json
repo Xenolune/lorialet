@@ -4,6 +4,8 @@
   "dependencies": {
     "aws-sdk": "^2.233.1",
     "discord.js": "^11.3.2",
+    "discord.js-commando": "^0.10.0",
+    "npm": "^6.0.1",
     "pg": "^7.4.3"
   },
   "name": "lorialet-bot",
