@@ -1,5 +1,4 @@
 /* Header */
-const ENV = require("./env.json")
 const CFG = require("./config.json")
 const Events = require("events")
 const {Client} = require("pg")
