@@ -121,6 +121,30 @@ const CMD = { // Commandes principales, objet parcouru par Bang+help pour la des
                 ping.timeout(msg);}
         }
     },
+ /* "role": {
+        usage: bang + "role [ajouter|retirer] [valeur] <@membre>",
+        description: "Modifier vos rôles Discord pour vos pronoms, votre ville, et vos talents.",
+        allowedIn: "#le-réseau-local + #le-client-ssh",
+        allowedFor: "Tout le monde peut modifier ses rôles, mais seuls les Quartz et les Diamonds peuvent modifier les rôles d'autres membres.",
+        allowedInID: [CFG.chanBot, CFG.chanBotMaster],
+        fcn: msg => {
+            let role = SUB.getParam(msg)[2]
+            let target = SUB.getParam(msg)[3]
+            SUB.isBotMaster(msg) ? null : target = undefined
+            // let roleList = [x,xx,xxx,xxxx] ?????
+            // DB_Query ?????
+            if (find(role).in(roleList) {
+                switch (SUB.getParam[1]) {
+                case "ajouter":
+                    msg.member.addRole(role)
+                    break;
+                case "retirer":
+                    msg.member.removeRole(role)
+                    break;
+                }
+            }
+        }
+    }, */
     "sleep": {
         usage: bang + "sleep",
         description: "Éteint le Bot.",
