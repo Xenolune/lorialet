@@ -50,14 +50,14 @@ bot.on("ready", () => { // Connection à Discord
 })
 /* Bot Commands */
 const SUB ={ // Sous-routines récurrentes dans les fonctions avancées
-    isBot : msg => msg.author.bot, // Renvoie true si le message vient d'un bot
-    isBotMaster : msg => msg.member.roles.get(CFG.botMasterRole), // Renvoie true si le message vient d'une personne avec le Role BotMaster
-    isOnBotChan : msg => (msg.channel.id == CFG.botChan || msg.channel.id == CFG.botMasterChan), // Renvoie true si le message vient de l'un des channels de bot
     hasBang : msg => msg.content.startsWith(bang), // Renvoie true si le message commence par le caractère Bang
     getCmd : msg => msg.content.split(" ")[0].substring(1), // Renvoie la première chaîne de caractères entre le Bang et le premier espace
     getParam : msg => msg.content.split(" "), // Renvoie un tableau contenant chaque chaîne de caractères entre espaces par ligne
     reqCmd : msg => SUB.hasBang(msg) && !SUB.isBot(msg) ? SUB.getCmd(msg) : null, // Renvoie getCmd si le message commence par Bang et n'est pas envoyé par unæ bot
-    isNotPing : msg => SUB.isBot(msg) && ((SUB.reqCmd(msg) == "ping") && (ping.last == false)) // True tant que le message n'est pas Bang+ping
+    isBot : msg => msg.author.bot, // Renvoie true si le message vient d'un bot
+    isBotMaster : msg => msg.member.roles.get(CFG.botMasterRole), // Renvoie true si le message vient d'une personne avec le Role BotMaster
+    isOnBotChan : msg => (msg.channel.id == CFG.botChan || msg.channel.id == CFG.botMasterChan), // Renvoie true si le message vient de l'un des channels de bot
+    isNotPing : msg => SUB.isBot(msg) && ((SUB.reqCmd(msg) == "ping") && (ping.last == false)), // True tant que le message n'est pas Bang+ping
 }
 const CMD = { // Commandes principales, objet parcouru par Bang+help pour la description des commandes
     "bang": {
@@ -121,30 +121,45 @@ const CMD = { // Commandes principales, objet parcouru par Bang+help pour la des
                 ping.timeout(msg);}
         }
     },
- /* "role": {
+    "role": {
         usage: bang + "role [ajouter|retirer] [valeur] <@membre>",
-        description: "Modifier vos rôles Discord pour vos pronoms, votre ville, et vos talents.",
+        description: "Modifier les rôles Discord de pronoms, ville, et talents.",
         allowedIn: "#le-réseau-local + #le-client-ssh",
-        allowedFor: "Tout le monde peut modifier ses rôles, mais seuls les Quartz et les Diamonds peuvent modifier les rôles d'autres membres.",
+        allowedFor: "Tout le monde peut modifier son rôle, mais seul·es les Quartz et les Diamonds peuvent modifier les rôles d'autres membres.",
         allowedInID: [CFG.chanBot, CFG.chanBotMaster],
         fcn: msg => {
-            let role = SUB.getParam(msg)[2]
-            let target = SUB.getParam(msg)[3]
-            SUB.isBotMaster(msg) ? null : target = undefined
-            // let roleList = [x,xx,xxx,xxxx] ?????
-            // DB_Query ?????
-            if (find(role).in(roleList) {
-                switch (SUB.getParam[1]) {
-                case "ajouter":
-                    msg.member.addRole(role)
-                    break;
-                case "retirer":
-                    msg.member.removeRole(role)
-                    break;
-                }
+            let errorLevel = 0 // augmentation par 1 2 4 8 16 ....
+            let action
+            let role
+            let target
+            switch (SUB.getParam(msg)[1]) { //définir Action
+                case "ajouter": action = "addRole"; break;
+                case "retirer": action = "removeRole"; break;
+                /*  case "changer": // need a function break; */
+                default: errorLevel += 1; break; }
+            msg.guild.roles.get(SUB.getParam(msg)[2].substring(3,21)) ? (role = SUB.getParam(msg)[2].substring(3,21)) : (errorLevel += 2) // find Role
+            SUB.getParam(msg)[3] ? (msg.guild.members.get(SUB.getParam(msg)[3].substring(2,20)) ? (SUB.isBotMaster(msg) ? (target = SUB.getParam(msg)[3].substring(2,20)) : errorLevel += 4) : errorLevel += 8) : (target = msg.member.id)
+            SUB.getParam(msg)[4] ? (errorLevel += 16) : null
+            if (role === "264345402524827648" || role === "264345422309359626" || role === "442968038011043840" || role === "430026621261709352" || role === "442967386858061824") {errorLevel += 32} // block diamond+quartz+bots*3
+            switch (errorLevel) {
+                case 0: // si errorLevel == 0, check si rôle déjà présent/absent, sinon envoyer la commande
+                    if (msg.guild.members.get(target).roles.get(role) && action === "addRole") { msg.channel.send("Tu es sûr·e de vouloir ajouter un rôle qu'unæ membre possède déjà ?")
+                    } else if (!msg.guild.members.get(target).roles.get(role) && action === "removeRole") { msg.channel.send("Tu es sûr·e de vouloir retirer un rôle qu'unæ membre ne possède pas ?")
+                    } else { msg.guild.members.get(target)[action](role); msg.channel.send("C'est fait ! <@" + target + "> " + (action === "addRole" ? "est désormais" : "n'est plus") + " <@&" + role + ">.") // it's working
+                    }; break;
+                case 1: msg.reply("il faut impérativement **ajouter** ou **retirer** un rôle."); break;
+                case 2: msg.reply("ce rôle n'existe pas ou il n'est pas permis de l'attribuer."); break;
+                case 3: msg.reply("se planter sur les deux paramètres vitaux de cette commande, c'est un peu le faire exprès."); break;
+                case 4: msg.reply("en principe j'ai dit \"seul·es les Quartz et les Diamonds\" mais en fait c'est juste AvA pour l'instant."); break;
+                case 6: msg.reply("tu n'est pas autorisé·e à modifier les rôles d'autrui (ou à trop parler dans ta requête), et en plus ce rôle n'existe pas et/ou n'est pas modifiable par cette commande."); break;
+                case 8: msg.reply("si tu tentes de mentionner un membre, ce serait bien qu'il existe sur ce serveur hein."); break;
+                case 11: msg.reply("TIPHAINE JE TE VOIS !"); break;
+                case 16: msg.reply("tu parles trop."); break;
+                case 32: msg.reply("LOL nope. On ne touche pas à ça."); break;
+                default: msg.reply("je ne comprends rien à ce que tu racontes."); break;
             }
         }
-    }, */
+    },
     "sleep": {
         usage: bang + "sleep",
         description: "Éteint le Bot.",
