@@ -10,7 +10,7 @@
     "sequelize": "^4.38.0"
   },
   "name": "lorialet-bot",
-  "version": "1.2.91",
+  "version": "1.2.0",
   "description": "Lorialet Master bot pour La Maison GoKind!",
   "main": "bot.js",
   "devDependencies": {},
