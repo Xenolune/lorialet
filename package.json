@@ -9,7 +9,7 @@
     "pg": "^7.4.3"
   },
   "name": "lorialet-bot",
-  "version": "1.0.2",
+  "version": "1.2.90",
   "description": "Lorialet Master bot pour La Maison GoKind!",
   "main": "bot.js",
   "devDependencies": {},
