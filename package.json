@@ -6,10 +6,11 @@
     "discord.js": "^11.3.2",
     "discord.js-commando": "^0.10.0",
     "npm": "^6.0.1",
-    "pg": "^7.4.3"
+    "pg": "^7.4.3",
+    "sequelize": "^4.38.0"
   },
   "name": "lorialet-bot",
-  "version": "1.2.90",
+  "version": "1.2.91",
   "description": "Lorialet Master bot pour La Maison GoKind!",
   "main": "bot.js",
   "devDependencies": {},
