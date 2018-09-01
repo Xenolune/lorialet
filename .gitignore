@@ -7,4 +7,5 @@ package-lock.json
 
 # Others
 auth.js
+auth-TO-BE-REMOVED.js
 *.backup

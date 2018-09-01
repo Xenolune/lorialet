@@ -2,6 +2,7 @@
 const CFG = require("./config.json")
 const Events = require("events")
 const {Client} = require("pg")
+const Sequelize = require("sequelize")
 const Discord = require("discord.js")
     // const Commando = require('discord.js-commando')
     // const FS = require("fs")
@@ -9,92 +10,107 @@ const Discord = require("discord.js")
 /* Initialisation */
 const event = new Events.EventEmitter()
 const bot = new Discord.Client() // COMMANDO SETTINGS {owner: OWNER,commandPrefix: bang}
-const db = new Client({connectionString: process.env.DATABASE_URL,ssl:true})
-    /* Initialisation BDD */
-var TOKEN
-var OWNER
-var bang
-db.connect() // ON PEUT FAIRE MIEUX SUR CES FONCTIONS
-db.query(
-    "SELECT valeur FROM config WHERE nom='discord_token';", (err, res) => {
-        TOKEN = res.rows[0].valeur ? res.rows[0].valeur : null
-        console.log(err ? err.stack : "Token is : \"" + TOKEN + "\"")
-        TOKEN ? null : process.exit(101) // surtout sur ces trois lignes
-    })
-db.query(
-    "SELECT valeur FROM config WHERE nom='owner';", (err, res) => {
-        OWNER = res.rows[0].valeur ? res.rows[0].valeur : null
-        console.log(err ? err.stack : "Owner ID is : \"" + OWNER + "\"")
-        OWNER ? null : process.exit(102) // mais on doit aussi pouvoir les fusionner non ? T.T
-    })
-db.query(
-    "SELECT valeur FROM config WHERE nom='bang';", (err, res) => {
-        bang = res.rows[0].valeur ? res.rows[0].valeur : null
-        console.log(err ? err.stack : "Bang is : \"" + bang + "\"")
-        bang ? null : process.exit(103)
-        db.end() // faut pas oublier ça à la fin des requêtes en tout cas !
-    })
-function login() { // Tente de se connecter jusqu'à recevoir un TOKEN (ou exit() )
-    if (TOKEN) {
-        bot.login(TOKEN)
-    } else {
-        setTimeout(function() {
-            login()
-        }, 500);
+/* Connexion BDD et bot */
+var BANG
+const ENV = CFG.dev_env ? require("./env.json") : null
+const sequelize = new Sequelize(
+    CFG.dev_env ? ENV.DATABASE_URL : process.env.DATABASE_URL,
+    {
+        dialect: 'postgres',
+        dialectOptions: {
+            ssl:'Amazon RDS'
+        }
+    }
+)
+const ConfigDB = sequelize.define(CFG.dev_env ? "config_next" : "config",
+    {
+        nom: {
+            type: Sequelize.STRING(255),
+            primaryKey: true
+        },
+        valeur: Sequelize.STRING(65535)
+    }, {
+        timestamps: false,
+        freezeTableName: true
+    }
+)
+ConfigDB.findOne({ where: {nom: "discord_token"} }).then(
+    token => bot.login(token.valeur),
+    error => {console.log(error);process.exit(101)}
+)
+ConfigDB.findOne({ where: {nom: "bang"} }).then(
+    bang => BANG = bang.valeur,
+    error => {console.log(error);process.exit(103)}
+)
+/* Bot Objects */
+const SUB = { // Sous-routines récurrentes dans les fonctions avancées
+    allowedMember : (msg) => CMD[SUB.getCmd(msg)].allowedForID.find(e => msg.member.roles.get(e)),
+    allowedChan : (msg) => CMD[SUB.getCmd(msg)].allowedInID.find(e => e == msg.channel.id),
+    getCmd : msg => msg.content.split(" ")[0].substring(BANG.length),
+    getParams : msg => msg.content.split(" "),
+    isModerator : search => {
+        console.log("search:" + search)
+        switch (typeof search) {
+            case "string": Object.values(CFG.roles["modération"]).find(e => e === search); break;
+            case "object": Object.values(CFG.roles["modération"]).find(e => e === search.member.rolesget(e)); break;
+            default: console.log("searchtype:" + typeof search)
+        }
     }
 }
-login() // cette fonction c'est vraiment de la merde
-bot.on("ready", () => { // Connection à Discord
-    console.log("Connecté sur Discord en tant que " + bot.user.tag);
-    bot.channels.get(CFG.botMasterChan).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");
-})
-/* Bot Commands */
-const SUB ={ // Sous-routines récurrentes dans les fonctions avancées
-    hasBang : msg => msg.content.startsWith(bang), // Renvoie true si le message commence par le caractère Bang
-    getCmd : msg => msg.content.split(" ")[0].substring(1), // Renvoie la première chaîne de caractères entre le Bang et le premier espace
-    getParam : msg => msg.content.split(" "), // Renvoie un tableau contenant chaque chaîne de caractères entre espaces par ligne
-    reqCmd : msg => SUB.hasBang(msg) && !SUB.isBot(msg) ? SUB.getCmd(msg) : null, // Renvoie getCmd si le message commence par Bang et n'est pas envoyé par unæ bot
-    isBot : msg => msg.author.bot, // Renvoie true si le message vient d'un bot
-    isBotMaster : msg => msg.member.roles.get(CFG.botMasterRole), // Renvoie true si le message vient d'une personne avec le Role BotMaster
-    isOnBotChan : msg => (msg.channel.id == CFG.botChan || msg.channel.id == CFG.botMasterChan), // Renvoie true si le message vient de l'un des channels de bot
-    isNotPing : msg => SUB.isBot(msg) && ((SUB.reqCmd(msg) == "ping") && (ping.last == false)), // True tant que le message n'est pas Bang+ping
-}
 const CMD = { // Commandes principales, objet parcouru par Bang+help pour la description des commandes
-    "bang": {
-        usage: bang + "bang <character>",
-        description: "Permet de modifier le \"bang\" d'appel de commande.\nLa fonction n'est pas encore implémentée pour l'instant.",
-        allowedIn: "#le-client-ssh",
-        allowedFor: "@Dev Bot",
-        allowedInID: [CFG.chanBotMaster],
-        allowedForID: [CFG.roleBotMaster],
+    "addEmoji": {
+        usage: "addEmoji <URL> nom",
+        description: "Ajouter au serveur l'émoji renseigné sur l'URL et l'associe au raccourci **:nom:**",
+        allowedIn: "Salons des bots (WiFi, SSH et labo)",
+        allowedFor: "Quartz & Diamonds",
+        allowedInID: [CFG.channels["borne-wifi"], CFG.channels["client-ssh"], CFG.channels["labo-robot"]],
+        allowedForID: [CFG.roles.autre["Quartz"], CFG.roles.autre["Diamond"]],
         fcn: msg => {
-            SUB.getParam(msg)[1] ? msg.reply("Vous voulez changer pour **" + SUB.getParam(msg)[1] +"**?") : msg.reply("Vous devez indiquer un paramètre avec cette fonction.")
-            msg.channel.send("Pour être honnête, je n'ai pas encore de fonction pour changer le bang, mais c'est déjà ça.")
+            let url = SUB.getParams(msg)[1]
+            let name = SUB.getParams(msg)[2]
+            if (url && name) {
+                msg.guild.createEmoji(url, name)
+                    .then(emoji => bot.channels.get(CFG.channels["tableau-véléda"]).send("Ajouté : " + emoji))
+                    .catch(error => error ? bot.channels.get(CFG.channels["client-ssh"]).send("Erreur à la création de l'emoji. Vérifier l'URL. Le nom de l'émoji ne peut contenir que [a-z][A-Z][0-9] ou \"_\".") : null)
+            } else {
+                msg.channel.send("il y a une erreur par ici\nURL = " + url + "\nName = " + name)
+            }
+        }
+    },
+    "bang": {
+        usage: "bang <character>",
+        description: "Permet de modifier le \"bang\" d'appel de commande.\nLa fonction n'est pas encore implémentée pour l'instant.",
+        allowedIn: "#le-client-SSH",
+        allowedFor: "Quartz & Diamonds",
+        allowedInID: [CFG.channels["client-ssh"]],
+        allowedForID: [CFG.roles.autre["Quartz"], CFG.roles.autre["Diamond"]],
+        fcn: msg => {
+            SUB.getParams(msg)[1] ? msg.reply("Vous voulez changer pour **" + SUB.getParams(msg)[1] +"**?") : msg.reply("Vous devez indiquer un paramètre avec cette fonction.")
+            msg.channel.send("Le Bang est : " + BANG + "\nPour être honnête, je n'ai pas encore de fonction pour changer le bang, mais c'est déjà ça.")
         }
     },
     "help": {
-        usage: bang + "help [commande]",
+        usage: "help [commande]",
         description: "Affiche la liste des commandes ou les informations d'une commande spécifique.",
-        allowedIn: "#le-réseau-local + #le-client-ssh",
-        allowedFor: "Tout le monde",
-        allowedInID: [CFG.chanBot, CFG.chanBotMaster],
-        allowedForID: [CFG.memberRole],
+        allowedIn: "Salons des bots (WiFi, SSH et labo)",
+        allowedFor: "Crystal Gems (tout le monde)",
+        allowedInID: [CFG.channels["borne-wifi"], CFG.channels["client-ssh"], CFG.channels["labo-robot"]],
+        allowedForID: [CFG.roles.autre["Crystal Gem"]],
         fcn: (msg) => {
-            if (SUB.getParam(msg)[1] == undefined) { // Si le message ne contient que la commande
+            if (SUB.getParams(msg)[1] == undefined) { // Si le message ne contient que la commande
                 let embed = new Discord.RichEmbed() // Créer un message Embed
                 embed.setColor(38600) // bleu
-                Object.keys(CMD).forEach(function(key, i, array) { // loop de l'objet CMD
-                    embed.addField(CMD[key].usage, CMD[key].description) // ajouter l'usage et la description
-                    i < array.length - 1 ? embed.addBlankField() : null // ajouter un blankfield entre les commandes
+                Object.keys(CMD).forEach((key, i, array) => { // loop de l'objet CMD
+                    CMD[key].allowedForID.find(e => msg.member.roles.get(e)) ? embed.addField(BANG + CMD[key].usage, CMD[key].description) : null // ajouter l'usage et la description des commandes autorisées uniquement
                 })
-                msg.channel.send("Voici la liste de mes fonctions : \n")
+                msg.channel.send("Voici la liste de mes fonctions que vous pouvez utiliser : \n")
                 msg.channel.send({ embed })
-            } else if (CMD[SUB.getParam(msg)[1]] != undefined) { // Si le premier paramètre est bien le nom d'une commande
-                let cmd = CMD[SUB.getParam(msg)[1]]
+            } else if (CMD[SUB.getParams(msg)[1]] != undefined) { // Si le premier paramètre est bien le nom d'une commande
+                let cmd = CMD[SUB.getParams(msg)[1]]
                 let embed = new Discord.RichEmbed()
                 embed.setColor(51350) // vert
-                embed.setAuthor(SUB.getParam(msg)[1])
-                embed.addField("Usage: ", cmd.usage)
+                embed.setAuthor(SUB.getParams(msg)[1])
+                embed.addField("Usage: ", BANG + cmd.usage)
                 embed.addField("Description: ", cmd.description)
                 embed.addField("Cannaux autorisés: ", cmd.allowedIn, true)
                 embed.addField("Membres autorisés: ", cmd.allowedFor, true)
@@ -104,43 +120,38 @@ const CMD = { // Commandes principales, objet parcouru par Bang+help pour la des
             }
         }
     },
-    "ping": {
-        usage: bang + "ping",
-        description: "Pour jouer au ping-pong avec ce bot.\nNe læ fatiguez pas trop s'il vous plaît.",
-        allowedIn: "#le-réseau-local + #le-client-ssh",
-        allowedFor: "Tout le monde",
-        allowedInID: [CFG.chanBot, CFG.chanBotMaster],
-        allowedForID: [CFG.memberRole],
-        fcn: msg => {
-            if (ping.count < 10 && ping.allowed) {
-                ping.last = true;
-                ping.count++;
-                msg.reply("pong !");
-                if (ping.count%4 == 0) {msg.reply("quelle partie, c'est fatiguant à force !")};
-            } else if (ping.allowed) {
-                ping.timeout(msg);}
-        }
-    },
     "role": {
-        usage: bang + "role [ajouter|retirer] [valeur] <@membre>",
-        description: "Modifier les rôles Discord de pronoms, ville, et talents.",
-        allowedIn: "#le-réseau-local + #le-client-ssh",
+        usage: "role [ajouter|retirer] [valeur] <@membre>",
+        description: "Modifier vos rôles (ville, pronoms/accords, talents ...) sur le serveur. Pour en créer, demandez à un·e Diamond.",
+        allowedIn: "Salons des bots (WiFi, SSH et labo)",
         allowedFor: "Tout le monde peut modifier son rôle, mais seul·es les Quartz et les Diamonds peuvent modifier les rôles d'autres membres.",
-        allowedInID: [CFG.chanBot, CFG.chanBotMaster],
+        allowedInID: [CFG.channels["borne-wifi"], CFG.channels["client-ssh"], CFG.channels["labo-robot"]],
+        allowedForID: [CFG.roles.autre["Crystal Gem"]],
         fcn: msg => {
             let errorLevel = 0 // augmentation par 1 2 4 8 16 ....
             let action
             let role
             let target
-            switch (SUB.getParam(msg)[1]) { //définir Action
+            switch (SUB.getParams(msg)[1]) { //définir Action
                 case "ajouter": action = "addRole"; break;
                 case "retirer": action = "removeRole"; break;
                 /*  case "changer": // need a function break; */
                 default: errorLevel += 1; break; }
-            msg.guild.roles.get(SUB.getParam(msg)[2].substring(3,21)) ? (role = SUB.getParam(msg)[2].substring(3,21)) : (errorLevel += 2) // find Role
-            SUB.getParam(msg)[3] ? (msg.guild.members.get(SUB.getParam(msg)[3].substring(2,20)) ? (SUB.isBotMaster(msg) ? (target = SUB.getParam(msg)[3].substring(2,20)) : errorLevel += 4) : errorLevel += 8) : (target = msg.member.id)
-            SUB.getParam(msg)[4] ? (errorLevel += 16) : null
-            if (role === "264345402524827648" || role === "264345422309359626" || role === "442968038011043840" || role === "430026621261709352" || role === "442967386858061824") {errorLevel += 32} // block diamond+quartz+bots*3
+            if (SUB.getParams(msg)[2]) {
+                role = SUB.getParams(msg)[2]
+                let type = role.startsWith("<") ? "mention" : "string"
+                if (type === "mention") {
+                    role = role.substring(3,21)
+                } else if (type === "string") {
+                    Array.from(CFG.roles)
+                    role = Object.keys(CFG.roles).find(e => e === CFG.roles[role]);
+                }
+                errorLevel += msg.guild.roles.get(role) ? 0 : 2
+            }
+            SUB.getParams(msg)[2] ? (msg.guild.roles.get(SUB.getParams(msg)[2].substring(3,21)) ? (role = SUB.getParams(msg)[2].substring(3,21)) : (errorLevel += 2) ) : null // find Role
+            SUB.getParams(msg)[3] ? (msg.guild.members.get(SUB.getParams(msg)[3].substring(2,20)) ? (SUB.isModerator(msg) ? (target = SUB.getParams(msg)[3].substring(2,20)) : errorLevel += 4) : errorLevel += 8) : target = msg.member.id
+            errorLevel += SUB.getParams(msg)[4] ? 16 : 0
+            errorLevel += SUB.isModerator(role) ? 32 : 0  // block diamond+quartz+bots*3
             switch (errorLevel) {
                 case 0: // si errorLevel == 0, check si rôle déjà présent/absent, sinon envoyer la commande
                     if (msg.guild.members.get(target).roles.get(role) && action === "addRole") { msg.channel.send("Tu es sûr·e de vouloir ajouter un rôle qu'unæ membre possède déjà ?")
@@ -156,84 +167,100 @@ const CMD = { // Commandes principales, objet parcouru par Bang+help pour la des
                 case 11: msg.reply("TIPHAINE JE TE VOIS !"); break;
                 case 16: msg.reply("tu parles trop."); break;
                 case 32: msg.reply("LOL nope. On ne touche pas à ça."); break;
+                case 64: msg.reply("à vide c'est inutile.")
                 default: msg.reply("je ne comprends rien à ce que tu racontes."); break;
             }
         }
     },
+    "list": {
+        usage: "list [roles|channels|members]",
+        description: "Liste les roles, salons ou membres du serveur.",
+        allowedIn: "#le-client-ssh",
+        allowedFor: "@Dev Bot",
+        allowedInID: [CFG.channels["client-ssh"]],
+        allowedForID: [CFG.roles.talent["Dev Bot"]],
+        fcn: msg => {
+            let param = [SUB.getParams(msg)[1]]
+            if (param == "members" || param == "roles" || param == "channels") {
+                let array = msg.guild[param].array()
+                array.sort(function(a,b) {return (a.name > b.name) ? 1 : ((b.name > a.name) ? -1 : 0)})
+                let answer = ""
+                if (param == "members") {
+                    array.forEach(element => {
+                        answer += element.displayName +" : "+ element.id +"\n"
+                    })
+                } else {
+                    array.forEach(element => {
+                        answer += (element.name == "@everyone") ? "" : element.name +" : "+ element.id +"\n"
+                    })
+                }
+                if (answer.length > 2000) {
+                    while (answer.length > 2000) {
+                        let index = answer.lastIndexOf("\n", 1995) + 1
+                        let shortAnswer = answer.substring(0, index)
+                        msg.channel.send(shortAnswer)
+                        answer = answer.replace(shortAnswer, "")
+                    }
+                }
+                msg.channel.send(answer)
+            } else return msg.reply("\"roles\", \"channels\" ou \"members\" s'il te plaît.")
+        }
+    },
     "sleep": {
-        usage: bang + "sleep",
+        usage: "sleep",
         description: "Éteint le Bot.",
         allowedIn: "#le-client-ssh",
         allowedFor: "@Dev Bot",
-        allowedInID: [CFG.chanBotMaster],
-        allowedForID: [CFG.roleBotMaster],
+        allowedInID: [CFG.channels["client-ssh"]],
+        allowedForID: [CFG.roles.talent["Dev Bot"]],
         fcn: msg => {
-            if (SUB.isBotMaster(msg)) { // si le message est envoyé par un BotMaster ...
-                bot.channels.get(CFG.botMasterChan).send("Je vais me coucher. Bonne nuit tout le monde !"); // prévient du dodo
-                setTimeout(function(){bot.destroy();}, 5000); // et kill le process proprement au bout de 5 secondes
-            } else {msg.reply("faut pas croire, seule ma maîtresse peut s'offrir ce loisir.")} // ou envoie un message d'erreur
+            bot.channels.get(CFG.channels["borne-wifi"]).send("Je vais me coucher. Bonne nuit tout le monde !"); // prévient du dodo
+            setTimeout(function(){bot.destroy();}, 3500); // et kill le process proprement au bout de 3.5 secondes
         }
     },
     "talk": {
-        usage: bang + "talk [salon] <Message>",
+        usage: "talk [salon] <Message>",
         description: "Envoie un message de la part du bot sur #le-réseau-local par défaut, ou un autre [salon] si précisé",
         allowedIn: "#le-client-ssh",
-        allowedFor: "@Dev Bot",
-        allowedInID: [CFG.chanBotMaster],
-        allowedForID: [CFG.roleBotMaster],
+        allowedFor: "Quartz & Diamonds",
+        allowedInID: [CFG.channels["client-ssh"]],
+        allowedForID: [CFG.roles.autre["Quartz"], CFG.roles.autre["Diamond"]],
         fcn: msg => {
             let chan
             let cnt = msg.content.substring(6) // Supprime l'appel de commande du message
-            let request = (cnt.startsWith("<#") ? SUB.getParam(msg)[1].substring(2,20) : null) // Définir request sur le premier paramètre s'il commence comme un ID de chan
-            if (request == undefined) { // Définir un chan par défaut s'il n'y a pas de request...
-                chan = bot.channels.get(CFG.botChan)
+            let request = (cnt.startsWith("<#") ? SUB.getParams(msg)[1].substring(2,20) : null) // Définir request sur le premier paramètre s'il commence comme un ID de chan
+            if (!request) { // Définir un chan par défaut s'il n'y a pas de request...
+                chan = bot.channels.get(CFG.channels["borne-wifi"])
             } else { // ou,
                 let exists = (bot.channels.get(request) ? true : false) // ... si le paramètre correspond bien à un channel du serveur ...
                 chan = (exists ? bot.channels.get(request) : null) // ... définir chan ...
                 cnt = cnt.substring(22) // ... et retirer le chan mentionné du contenu du message
             }
-            chan == undefined ? msg.reply("Erreur, je ne connais pas ce cannal") : chan.send(cnt) // Envoie le message sur le bon chan, ou une erreur
+            (!chan) ? msg.reply("Erreur, je ne connais pas ce cannal") : chan.send(cnt) // Envoie le message sur le bon chan, ou une erreur
         }
-    },
-    "notCmd": {
-        usage: bang + " + n'importe quelle suite de caractères non reconnus",
-        description: "Message d'erreur en cas de commande erronée.",
-        allowedIn: "Partout",
-        allowedFor: "Tout le monde",
-        allowedInID: null,
-        allowedForID: [CFG.memberRole],
-        fcn: msg => msg.reply(SUB.getCmd(msg) + " n'est pas une commande que je connaisse. Essaye " + bang + "help." )
     }
 }
-const ping = {
-    count: 0,
-    last: false,
-    allowed: true,
-    reset: () => {ping.count = 0;ping.last = false;},
-    timeout: msg => {
-        let pause = 10 * 60000;
-        msg.reply("faisons une pause pour " + pause/60000 + " minutes.")
-        ping.reset();
-        ping.allowed = false;
-        setTimeout(function() {
-            msg.channel.send("Bien, nous pouvons recommencer à jouer !");
-            ping.allowed = true;
-        }, pause);
-    }
-};
 /* Bot Triggers */
-bot.on("message", msg => {
-    if (SUB.isOnBotChan(msg)) { // Ce serait mieux de vérifier le chan pour valider si la commande peut-être exécutée)
-        SUB.isNotPing(msg) ? ping.reset() : null // ping.reset() A CHAQUE MESSAGE DANS UN BOTCHAN ?
-        if (SUB.hasBang(msg)) { // S'il y a bien un bang,
-            if (CMD[SUB.reqCmd(msg)] != undefined) { // Si la commande existe,
-                CMD[SUB.reqCmd(msg)].fcn(msg) // chercher la commande demandée et exécuter la fonction associée
-            } else { CMD.notCmd.fcn(msg) // Sinon fonction de fallback
-            }
-        }
-    }
+bot.on("ready", () => { // Connection à Discord
+    console.log("Connecté sur Discord en tant que " + bot.user.tag);
+    bot.channels.get(CFG.channels["client-ssh"]).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");
 })
-/* Errors */
+bot.on("message", msg => {
+    if (!msg.author.bot) { // Pour tout message qui n'émane pas d'un·e bot,
+        if (msg.content.startsWith(BANG)) { // qui commence par BANG
+            if (CMD[SUB.getCmd(msg)]) { // et dont une fonction correspondante existe,
+                if (SUB.allowedChan(msg)) { // qu'elle est autorisée sur ce salon
+                    if (SUB.allowedMember(msg)) { // et à ce membre
+                        CMD[SUB.getCmd(msg)].fcn(msg) // alors on exécute la commande
+                    } else {msg.reply("tu n'as pas le droit de faire ça.")}
+                } else {msg.reply("tu n'as pas le droit de faire ça ici.")}
+            } else if (BANG === ":" && SUB.getParams(msg)[0].endsWith(":")) { return // ne réagit pas aux émotes Discord
+            } else {msg.reply("cette commande m'est inconnue. Essaye "+BANG+"help.")}
+        } // Début des réactions non-commande
+    } // Début des réactions accessibles aux autres bots
+})
+/* Critical Errors */
+process.on('unhandledRejection', console.error)
 process.on("exit", (code) => {
     switch (code) {
         case 101:
