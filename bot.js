@@ -12,6 +12,7 @@ const event = new Events.EventEmitter()
 const bot = new Discord.Client() // COMMANDO SETTINGS {owner: OWNER,commandPrefix: bang}
 /* Connexion BDD et bot */
 var BANG
+var RUNCMD
 const ENV = CFG.dev_env ? require("./env.json") : null
 const sequelize = new Sequelize(
     CFG.dev_env ? ENV.DATABASE_URL : process.env.DATABASE_URL,
@@ -243,11 +244,12 @@ const CMD = { // Commandes principales, objet parcouru par Bang+help pour la des
 /* Bot Triggers */
 bot.on("ready", () => { // Connection à Discord
     console.log("Connecté sur Discord en tant que " + bot.user.tag);
+    RUNCMD = new RegExp(BANG + "[a-z]", "i");
     bot.channels.get(CFG.channels["client-ssh"]).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");
 })
 bot.on("message", msg => {
     if (!msg.author.bot) { // Pour tout message qui n'émane pas d'un·e bot,
-        if (msg.content.startsWith(BANG)) { // qui commence par BANG
+        if (msg.content.match(RUNCMD)) { // qui commence par BANG puis une lettre,
             if (CMD[SUB.getCmd(msg)]) { // et dont une fonction correspondante existe,
                 if (SUB.allowedChan(msg)) { // qu'elle est autorisée sur ce salon
                     if (SUB.allowedMember(msg)) { // et à ce membre
