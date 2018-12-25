@@ -244,7 +244,7 @@ const CMD = { // Commandes principales, objet parcouru par Bang+help pour la des
 /* Bot Triggers */
 bot.on("ready", () => { // Connection à Discord
     console.log("Connecté sur Discord en tant que " + bot.user.tag);
-    RUNCMD = new RegExp(^BANG + "[a-z]", "i");
+    RUNCMD = new RegExp("^" + BANG + "[a-z]", "i");
     bot.channels.get(CFG.channels["client-ssh"]).send("J'ai bien dormi ! Comment allez-vous aujourd'hui ?");
 })
 bot.on("message", msg => {
